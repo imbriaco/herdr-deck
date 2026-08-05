@@ -1,0 +1,60 @@
+{
+  "Name": "Herd Deck",
+  "Version": "0.1.0.0",
+  "Author": "Mark Imbriaco",
+  "Actions": [
+    {
+      "Name": "Agent Slot",
+      "UUID": "dev.herdr.deck.agent-slot",
+      "Icon": "imgs/actions/agent/icon",
+      "Tooltip": "Live status for one Herdr agent (by list order). Press to focus.",
+      "PropertyInspectorPath": "ui/agent-slot.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/agent/key",
+          "TitleAlignment": "top",
+          "FontSize": 11
+        }
+      ]
+    },
+    {
+      "Name": "Herd Status",
+      "UUID": "dev.herdr.deck.status",
+      "Icon": "imgs/actions/status/icon",
+      "Tooltip": "Worst agent status across the herd — the across-the-room light.",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/status/key",
+          "TitleAlignment": "middle",
+          "FontSize": 12
+        }
+      ]
+    }
+  ],
+  "Category": "Herd Deck",
+  "CategoryIcon": "imgs/plugin/category-icon",
+  "CodePath": "bin/plugin.js",
+  "Description": "Stream Deck bridge for Herdr: live agent status lights and one-key focus.",
+  "Icon": "imgs/plugin/marketplace",
+  "SDKVersion": 3,
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "12"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Nodejs": {
+    "Version": "24",
+    "Debug": "enabled"
+  },
+  "UUID": "dev.herdr.deck"
+}

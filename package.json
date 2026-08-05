@@ -1,0 +1,28 @@
+{
+  "name": "herd-deck",
+  "version": "0.1.0",
+  "description": "Stream Deck bridge for Herdr agents — live status lights and one-key focus",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart dev.herdr.deck\"",
+    "link": "streamdeck link dev.herdr.deck.sdPlugin",
+    "restart": "streamdeck restart dev.herdr.deck",
+    "validate": "streamdeck validate dev.herdr.deck.sdPlugin"
+  },
+  "devDependencies": {
+    "@elgato/cli": "^1.7.4",
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^15.2.2",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@rollup/plugin-typescript": "^12.1.0",
+    "@tsconfig/node20": "^20.1.2",
+    "@types/node": "~24.1.0",
+    "rollup": "^4.0.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "^2.1.0"
+  }
+}
