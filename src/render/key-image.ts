@@ -87,7 +87,9 @@ function agentGlyphSvg(agent: string | undefined): string {
  * `brightness` dims the fill (used for blocked breathing). Defaults to full.
  */
 export function keyFace(opts: {
-  status: AgentStatus | "empty" | "offline";
+  status?: AgentStatus | "empty" | "offline";
+  /** Override fill colour (e.g. launch keys) — packed 0xRRGGBB. */
+  color?: number;
   focused?: boolean;
   /** Drawn near the top of the key; empty string = colour only. */
   label?: string;
@@ -96,7 +98,7 @@ export function keyFace(opts: {
   /** 0..1 fill brightness. Blocked keys pulse this. */
   brightness?: number;
 }): string {
-  const base = STATUS_COLORS[opts.status];
+  const base = opts.color ?? STATUS_COLORS[opts.status ?? "empty"];
   const brightness = opts.brightness ?? 1;
   const fill = hex(scaleColor(base, brightness));
   const focused = opts.focused === true;

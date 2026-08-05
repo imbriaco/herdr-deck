@@ -117,6 +117,71 @@ export async function focusAgent(target: string): Promise<void> {
   await request("agent.focus", { target });
 }
 
+export type CreatedWorkspace = {
+  workspaceId: string;
+  label: string;
+  paneId: string;
+  tabId?: string;
+};
+
+/**
+ * Create a Herdr workspace. `cwd` is where the root pane's shell starts
+ * (so you get a free "cd"); `label` is the sidebar name; `focus` brings it
+ * forward.
+ */
+export async function createWorkspace(opts: {
+  cwd?: string;
+  label?: string;
+  focus?: boolean;
+}): Promise<CreatedWorkspace> {
+  const params: Record<string, unknown> = {
+    focus: opts.focus ?? true,
+  };
+  if (opts.cwd) params.cwd = opts.cwd;
+  if (opts.label) params.label = opts.label;
+
+  const result = await request("workspace.create", params, 15_000);
+  const workspace = (result.workspace as Record<string, unknown> | undefined) ?? {};
+  const root = (result.root_pane as Record<string, unknown> | undefined) ?? {};
+  const workspaceId = typeof workspace.workspace_id === "string" ? workspace.workspace_id : "";
+  const paneId = typeof root.pane_id === "string" ? root.pane_id : "";
+  if (!workspaceId || !paneId) {
+    throw new Error("workspace.create returned no workspace/pane id");
+  }
+  return {
+    workspaceId,
+    label: typeof workspace.label === "string" ? workspace.label : opts.label ?? workspaceId,
+    paneId,
+    tabId: typeof root.tab_id === "string" ? root.tab_id : undefined,
+  };
+}
+
+/**
+ * Start a supported agent in an existing pane. The pane must already be at an
+ * interactive shell prompt (fresh workspace.create panes are).
+ *
+ * `name` and `kind` are both set from the agent id the user picked (claude,
+ * codex, grok, …) — that matches the CLI: `herdr agent start claude --kind claude`.
+ */
+export async function startAgent(opts: {
+  agent: string;
+  paneId: string;
+  timeoutMs?: number;
+}): Promise<void> {
+  const agent = opts.agent.trim().toLowerCase();
+  if (!agent) throw new Error("agent is empty");
+  await request(
+    "agent.start",
+    {
+      name: agent,
+      kind: agent,
+      pane_id: opts.paneId,
+      timeout_ms: opts.timeoutMs ?? 30_000,
+    },
+    (opts.timeoutMs ?? 30_000) + 5_000,
+  );
+}
+
 export type EventHandler = (event: Record<string, unknown>) => void;
 
 /**

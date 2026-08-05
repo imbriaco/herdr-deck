@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Launch Workspace</title>
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+  </head>
+  <body>
+    <sdpi-item label="Name">
+      <sdpi-textfield
+        setting="name"
+        placeholder="my-app"
+      ></sdpi-textfield>
+    </sdpi-item>
+
+    <sdpi-item label="Path">
+      <sdpi-textfield
+        setting="path"
+        placeholder="~/src/my-app"
+      ></sdpi-textfield>
+    </sdpi-item>
+
+    <sdpi-item label="Agent">
+      <sdpi-select setting="agent" placeholder="None (shell only)">
+        <option value="">None (shell only)</option>
+        <option value="claude">claude</option>
+        <option value="codex">codex</option>
+        <option value="grok">grok</option>
+        <option value="gemini">gemini</option>
+        <option value="cursor">cursor</option>
+        <option value="opencode">opencode</option>
+        <option value="copilot">copilot</option>
+        <option value="amp">amp</option>
+        <option value="pi">pi</option>
+      </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="Tip">
+      <details class="message">
+        <summary>What this does</summary>
+        <p>
+          Creates a new Herdr workspace labelled with <strong>Name</strong>,
+          starts the shell in <strong>Path</strong> (<code>~</code> is expanded),
+          and optionally runs <strong>Agent</strong> there. Leave agent empty to
+          land on a plain shell.
+        </p>
+      </details>
+    </sdpi-item>
+  </body>
+</html>

@@ -10,9 +10,11 @@
       "Tooltip": "Live status for one Herdr agent (by list order). Press to focus.",
       "PropertyInspectorPath": "ui/agent-slot.html",
       "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
       "States": [
         {
           "Image": "imgs/actions/agent/key",
+          "ShowTitle": false,
           "TitleAlignment": "top",
           "FontSize": 11
         }
@@ -24,11 +26,30 @@
       "Icon": "imgs/actions/status/icon",
       "Tooltip": "Worst agent status across the herd — the across-the-room light.",
       "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
       "States": [
         {
           "Image": "imgs/actions/status/key",
+          "ShowTitle": false,
           "TitleAlignment": "middle",
           "FontSize": 12
+        }
+      ]
+    },
+    {
+      "Name": "Launch Workspace",
+      "UUID": "dev.herdr.deck.launch",
+      "Icon": "imgs/actions/launch/icon",
+      "Tooltip": "Open a Herdr workspace at a path, optionally starting an agent.",
+      "PropertyInspectorPath": "ui/launch.html",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/launch/key",
+          "ShowTitle": false,
+          "TitleAlignment": "top",
+          "FontSize": 11
         }
       ]
     }

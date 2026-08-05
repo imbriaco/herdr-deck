@@ -59,11 +59,23 @@ Requires Stream Deck software ≥ 7.1 and a running Herdr server.
 Stream Deck launches the plugin, so env vars need to be visible to that
 process (launchd / `launchctl setenv`, or set them later via a config file).
 
+## Launch Workspace
+
+Drop a **Launch Workspace** action and set:
+
+| field | example | purpose |
+|-------|---------|---------|
+| Name | `my-app` | Button label + Herdr workspace label |
+| Path | `~/src/my-app` | Shell cwd (`~` expanded) |
+| Agent | `claude` (optional) | Start this agent in the new pane; empty = shell only |
+
+Press → `workspace.create` (focused) → optional `agent.start` → raise terminal.
+
 ## Roadmap
 
 - [x] Agent slots + focus + raise terminal
 - [x] Aggregate status key
-- [ ] Superwhisper / voice key
-- [ ] Text macros into the focused prompt
-- [ ] Tab cycle
-- [ ] Breathing animation for blocked
+- [x] Blocked breathing
+- [x] Workspace labels + agent glyphs
+- [x] Launch workspace (path + optional agent)
+- [ ] More Herdr controls (as needed)
