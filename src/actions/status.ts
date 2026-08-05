@@ -85,6 +85,7 @@ export class HerdStatus extends SingletonAction {
       keyFace({
         status,
         label: `${statusLabel(status)} · ${count}`,
+        brightness: status === "blocked" ? state.breath : 1,
       }),
     );
   }

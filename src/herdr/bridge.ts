@@ -14,18 +14,36 @@ import { focusTarget } from "./types";
  *   3. a slow poll of agent.list as a backstop
  *
  * agent.list is always the source of truth; events only decide *when* to look.
+ *
+ * Blocked keys “breathe” in software: a short interval updates `breath` so
+ * action paint can dim the red fill like the Creator Micro’s LED effect.
  */
 class HerdrBridge {
   private listeners = new Set<BridgeListener>();
-  private state: BridgeState = { agents: [], workspaceLabels: {}, connected: false };
+  private state: BridgeState = {
+    agents: [],
+    workspaceLabels: {},
+    connected: false,
+    breath: 1,
+  };
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private breathTimer: ReturnType<typeof setInterval> | null = null;
+  private breathOrigin = 0;
+  private lastBreathStep = -1;
   private lifecycle: HerdrEventStream | null = null;
   private statusStreams = new Map<string, HerdrEventStream>();
   private started = false;
 
   readonly pollIntervalMs = 2500;
   readonly debounceMs = 100;
+  /** Full breath cycle length — similar feel to firmware “breathing”. */
+  readonly breathPeriodMs = 2200;
+  /** How often we push a new frame while something is blocked. */
+  readonly breathTickMs = 90;
+  /** Dim floor so blocked never goes fully dark. */
+  readonly breathMin = 0.32;
+  readonly breathMax = 1;
 
   get current(): BridgeState {
     return this.state;
@@ -48,6 +66,7 @@ class HerdrBridge {
     this.pollTimer = null;
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = null;
+    this.stopBreath();
     this.lifecycle?.stop();
     this.lifecycle = null;
     for (const stream of this.statusStreams.values()) stream.stop();
@@ -95,6 +114,7 @@ class HerdrBridge {
 
   private publish(next: BridgeState): void {
     this.state = next;
+    this.syncBreathTimer(next);
     for (const listener of this.listeners) {
       try {
         listener(next);
@@ -121,7 +141,13 @@ class HerdrBridge {
         listWorkspaceLabels().catch(() => this.state.workspaceLabels),
       ]);
       this.reconcileStatusStreams(agents);
-      this.publish({ agents, workspaceLabels, connected: true, error: undefined });
+      this.publish({
+        agents,
+        workspaceLabels,
+        connected: true,
+        error: undefined,
+        breath: this.state.breath,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       streamDeck.logger.warn(`Herdr refresh failed: ${message}`);
@@ -130,6 +156,7 @@ class HerdrBridge {
         workspaceLabels: this.state.workspaceLabels,
         connected: false,
         error: message,
+        breath: this.state.breath,
       });
     }
   }
@@ -180,6 +207,80 @@ class HerdrBridge {
         },
       ).start();
       this.statusStreams.set(paneId, stream);
+    }
+  }
+
+  // --- Breathing ----------------------------------------------------------
+
+  private anyBlocked(state: BridgeState): boolean {
+    return state.connected && state.agents.some((a) => a.status === "blocked");
+  }
+
+  private syncBreathTimer(state: BridgeState): void {
+    if (this.anyBlocked(state)) {
+      this.startBreath();
+      return;
+    }
+    const wasBreathing = this.breathTimer !== null || state.breath !== 1;
+    this.stopBreath();
+    if (wasBreathing && this.state.breath !== 1) {
+      // Snap back to full brightness and repaint once (don't go through publish).
+      this.state = { ...this.state, breath: 1 };
+      for (const listener of this.listeners) {
+        try {
+          listener(this.state);
+        } catch (err) {
+          streamDeck.logger.error("Bridge listener failed", err);
+        }
+      }
+    }
+  }
+
+  private startBreath(): void {
+    if (this.breathTimer) return;
+    this.breathOrigin = Date.now();
+    this.lastBreathStep = -1;
+    this.breathTimer = setInterval(() => this.breathTick(), this.breathTickMs);
+    this.breathTick();
+  }
+
+  private stopBreath(): void {
+    if (!this.breathTimer) return;
+    clearInterval(this.breathTimer);
+    this.breathTimer = null;
+    this.lastBreathStep = -1;
+  }
+
+  private breathTick(): void {
+    if (!this.started || !this.anyBlocked(this.state)) {
+      this.stopBreath();
+      if (this.state.breath !== 1) {
+        this.publish({ ...this.state, breath: 1 });
+      }
+      return;
+    }
+
+    const t =
+      ((Date.now() - this.breathOrigin) / this.breathPeriodMs) * Math.PI * 2;
+    // 0..1 sine, then map into [breathMin, breathMax].
+    const wave = 0.5 + 0.5 * Math.sin(t);
+    const breath =
+      this.breathMin + (this.breathMax - this.breathMin) * wave;
+
+    // Quantize so we don't spam setImage with imperceptible changes.
+    const step = Math.round(breath * 20);
+    if (step === this.lastBreathStep) return;
+    this.lastBreathStep = step;
+
+    // Notify listeners without re-entering syncBreathTimer's start path
+    // unnecessarily — publish handles it and the timer is already running.
+    this.state = { ...this.state, breath };
+    for (const listener of this.listeners) {
+      try {
+        listener(this.state);
+      } catch (err) {
+        streamDeck.logger.error("Bridge listener failed", err);
+      }
     }
   }
 }

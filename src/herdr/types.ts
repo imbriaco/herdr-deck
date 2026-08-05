@@ -20,6 +20,11 @@ export type BridgeState = {
   connected: boolean;
   /** Human-readable last error, if any. */
   error?: string;
+  /**
+   * Brightness multiplier for blocked-key breathing (0.35..1).
+   * Full brightness when nothing is blocked.
+   */
+  breath: number;
 };
 
 export type BridgeListener = (state: BridgeState) => void;

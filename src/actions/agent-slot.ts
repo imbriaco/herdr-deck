@@ -137,6 +137,8 @@ export class AgentSlot extends SingletonAction<SlotSettings> {
         status,
         focused: agent.focused,
         label: name,
+        // Software stand-in for the Micro's blocked breathing LED.
+        brightness: status === "blocked" ? state.breath : 1,
       }),
     );
   }
