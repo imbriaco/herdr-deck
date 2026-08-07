@@ -11,12 +11,21 @@ import streamDeck from "@elgato/streamdeck";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { createWorkspace, startAgent } from "../herdr/client";
+import {
+  createWorkspace,
+  HerdrApiError,
+  makeAgentSessionName,
+  startAgent,
+} from "../herdr/client";
 import { keyFace } from "../render/key-image";
 import { raiseTerminal } from "../terminal";
 
 /** Indigo — distinct from live status greens/ambers so launch keys read as "actions". */
 const LAUNCH_COLOR = 0x5c6bc0;
+
+/** How long to wait for a fresh pane's shell before giving up on agent.start. */
+const SHELL_READY_TIMEOUT_MS = 12_000;
+const SHELL_READY_POLL_MS = 250;
 
 type LaunchSettings = {
   /** Button + workspace label. */
@@ -32,6 +41,11 @@ type LaunchSettings = {
  *
  * Example: name=my-app, path=~/src/my-app, agent=claude
  * → new workspace labelled "my-app", shell in that dir, `claude` started.
+ *
+ * There is no single workspace.create+command API. We create the workspace
+ * (shell already in cwd), then agent.start once the pane is at a prompt.
+ * agent.start's `name` must be unique across managed agents — we mint one
+ * from label + kind rather than reusing the bare kind string.
  */
 @action({ UUID: "dev.herdr.deck.launch" })
 export class LaunchWorkspace extends SingletonAction<LaunchSettings> {
@@ -55,7 +69,7 @@ export class LaunchWorkspace extends SingletonAction<LaunchSettings> {
     const settings = ev.payload.settings;
     const name = (settings.name ?? "").trim();
     const path = (settings.path ?? "").trim();
-    const agent = (settings.agent ?? "").trim().toLowerCase();
+    const agentKind = (settings.agent ?? "").trim().toLowerCase();
 
     if (!path) {
       await ev.action.showAlert();
@@ -68,7 +82,7 @@ export class LaunchWorkspace extends SingletonAction<LaunchSettings> {
 
     try {
       streamDeck.logger.info(
-        `Launch workspace label=${label} cwd=${cwd} agent=${agent || "(none)"}`,
+        `Launch workspace label=${label} cwd=${cwd} agent=${agentKind || "(none)"}`,
       );
       const created = await createWorkspace({
         cwd,
@@ -76,8 +90,12 @@ export class LaunchWorkspace extends SingletonAction<LaunchSettings> {
         focus: true,
       });
 
-      if (agent) {
-        await startAgentWithRetry(agent, created.paneId);
+      if (agentKind) {
+        const sessionName = makeAgentSessionName(agentKind, label);
+        streamDeck.logger.info(
+          `Starting agent kind=${agentKind} name=${sessionName} pane=${created.paneId}`,
+        );
+        await startAgentWhenReady(agentKind, sessionName, created.paneId);
       }
 
       await raiseTerminal();
@@ -135,17 +153,64 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Fresh workspace panes are usually at a prompt immediately; if agent.start
- * races the shell, wait once and try again.
+ * Poll agent.start until the pane shell is ready, or fail after a deadline.
+ *
+ * Fresh workspace.create panes often aren't interactive yet — Herdr returns
+ * target-busy until `available_shell_name` succeeds. That's a real race, not
+ * a missing one-shot API (workspace.create has no command field).
  */
-async function startAgentWithRetry(agent: string, paneId: string): Promise<void> {
-  try {
-    await startAgent({ agent, paneId });
-  } catch (err) {
-    streamDeck.logger.warn(
-      `agent.start failed, retrying in 1.5s: ${err instanceof Error ? err.message : err}`,
-    );
-    await sleep(1500);
-    await startAgent({ agent, paneId });
+async function startAgentWhenReady(
+  kind: string,
+  sessionName: string,
+  paneId: string,
+): Promise<void> {
+  const deadline = Date.now() + SHELL_READY_TIMEOUT_MS;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    try {
+      await startAgent({
+        kind,
+        name: sessionName,
+        paneId,
+        timeoutMs: 30_000,
+      });
+      return;
+    } catch (err) {
+      lastError = err;
+      if (isRetryableStartError(err)) {
+        streamDeck.logger.debug(
+          `agent.start not ready yet (${err instanceof Error ? err.message : err}); retrying`,
+        );
+        await sleep(SHELL_READY_POLL_MS);
+        continue;
+      }
+      throw err;
+    }
   }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Timed out waiting for shell on ${paneId}`);
+}
+
+function isRetryableStartError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const message = err.message.toLowerCase();
+  const code = err instanceof HerdrApiError ? (err.code ?? "").toLowerCase() : "";
+
+  // Herdr codes / messages observed when the pane shell isn't interactive yet.
+  if (code.includes("busy") || code.includes("unavailable") || code.includes("not_ready")) {
+    return true;
+  }
+  if (
+    message.includes("busy") ||
+    message.includes("not ready") ||
+    message.includes("unavailable") ||
+    message.includes("shell") ||
+    message.includes("interactive")
+  ) {
+    return true;
+  }
+  return false;
 }

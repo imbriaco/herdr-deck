@@ -25,6 +25,17 @@ function requestId(): string {
   return `hd_${nextId}`;
 }
 
+/** Herdr JSON-RPC error with optional machine-readable code. */
+export class HerdrApiError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "HerdrApiError";
+    this.code = code;
+  }
+}
+
 export async function request(
   method: string,
   params: Record<string, unknown> = {},
@@ -63,11 +74,16 @@ export async function request(
       if (!line) return;
       try {
         const object = JSON.parse(line) as {
-          error?: { message?: string };
+          error?: { message?: string; code?: string };
           result?: Record<string, unknown>;
         };
         if (object.error) {
-          finish(new Error(object.error.message ?? "Herdr API error"));
+          finish(
+            new HerdrApiError(
+              object.error.message ?? "Herdr API error",
+              object.error.code,
+            ),
+          );
         } else {
           finish(null, object.result ?? {});
         }
@@ -157,29 +173,55 @@ export async function createWorkspace(opts: {
 }
 
 /**
- * Start a supported agent in an existing pane. The pane must already be at an
- * interactive shell prompt (fresh workspace.create panes are).
+ * Start a supported agent in an existing pane.
  *
- * `name` and `kind` are both set from the agent id the user picked (claude,
- * codex, grok, …) — that matches the CLI: `herdr agent start claude --kind claude`.
+ * Herdr treats `name` as a **unique session id** (not the agent kind). Reusing
+ * `name: "claude"` when another managed agent already has that name fails with
+ * a duplicate-name error — so callers should pass a unique `name` and the
+ * executable kind separately (`kind: "claude"`, `name: "claude-ab12"`).
+ *
+ * The pane must be at an interactive shell prompt; otherwise Herdr returns a
+ * "busy" / not-ready style error until the shell settles.
  */
 export async function startAgent(opts: {
-  agent: string;
+  /** Unique managed-agent name (a-z…, max 32). */
+  name: string;
+  /** Agent kind / executable: claude, codex, grok, … */
+  kind: string;
   paneId: string;
   timeoutMs?: number;
 }): Promise<void> {
-  const agent = opts.agent.trim().toLowerCase();
-  if (!agent) throw new Error("agent is empty");
+  const kind = opts.kind.trim().toLowerCase();
+  const name = opts.name.trim().toLowerCase();
+  if (!kind) throw new Error("agent kind is empty");
+  if (!name) throw new Error("agent name is empty");
   await request(
     "agent.start",
     {
-      name: agent,
-      kind: agent,
+      name,
+      kind,
       pane_id: opts.paneId,
       timeout_ms: opts.timeoutMs ?? 30_000,
     },
     (opts.timeoutMs ?? 30_000) + 5_000,
   );
+}
+
+/**
+ * Herdr agent names: start with a-z, then [a-z0-9_-], max 32 chars.
+ * Used for the unique `name` field on agent.start.
+ */
+export function makeAgentSessionName(kind: string, label: string): string {
+  const raw = `${kind}-${label}-${Math.random().toString(36).slice(2, 6)}`
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const fallback = `${kind}-${Math.random().toString(36).slice(2, 8)}`;
+  const candidate = (raw.length > 0 ? raw : fallback).slice(0, 32);
+  // Must start with a letter.
+  return /^[a-z]/.test(candidate) ? candidate : `a${candidate}`.slice(0, 32);
 }
 
 export type EventHandler = (event: Record<string, unknown>) => void;
