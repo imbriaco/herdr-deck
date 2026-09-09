@@ -129,6 +129,19 @@ export async function listWorkspaceLabels(): Promise<Record<string, string>> {
   return labels;
 }
 
+/** tab_id → tab bar label. `tab.list` without a workspace returns every tab. */
+export async function listTabLabels(): Promise<Record<string, string>> {
+  const result = await request("tab.list");
+  const raw = (result.tabs as Record<string, unknown>[] | undefined) ?? [];
+  const labels: Record<string, string> = {};
+  for (const tab of raw) {
+    const id = typeof tab.tab_id === "string" ? tab.tab_id : undefined;
+    const label = typeof tab.label === "string" ? tab.label : undefined;
+    if (id && label) labels[id] = label;
+  }
+  return labels;
+}
+
 export async function focusAgent(target: string): Promise<void> {
   await request("agent.focus", { target });
 }

@@ -16,6 +16,8 @@ export type BridgeState = {
   agents: HerdrAgent[];
   /** workspace_id → Herdr sidebar label. */
   workspaceLabels: Record<string, string>;
+  /** tab_id → Herdr tab label. */
+  tabLabels: Record<string, string>;
   /** True when we last successfully talked to the socket. */
   connected: boolean;
   /** Human-readable last error, if any. */
@@ -66,6 +68,17 @@ export function displayName(
     if (label && label.trim()) return label.trim();
   }
   return shortName(agent);
+}
+
+/** Tab label shown under the workspace name on the key. */
+export function tabDisplayName(
+  agent: HerdrAgent,
+  tabLabels: Record<string, string> = {},
+): string | undefined {
+  if (!agent.tabId) return undefined;
+  const label = tabLabels[agent.tabId];
+  if (label && label.trim()) return label.trim();
+  return undefined;
 }
 
 export function parseAgent(raw: Record<string, unknown>): HerdrAgent {
