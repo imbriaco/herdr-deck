@@ -2,6 +2,7 @@ import streamDeck from "@elgato/streamdeck";
 
 import {
   focusAgent,
+  focusTab,
   HerdrEventStream,
   listAgents,
   listTabLabels,
@@ -103,6 +104,9 @@ class HerdrBridge {
     // next list) will reconcile if something races us.
     this.applyOptimisticFocus(slot);
     await focusAgent(target);
+    // agent.focus updates server-side agent focus; Herdr 0.9+ TUI clients
+    // keep their own workspace/tab view and need tab.focus to actually move.
+    if (agent.tabId) await focusTab(agent.tabId);
   }
 
   /** Flip focused flags locally so the ring doesn't wait on the next poll. */

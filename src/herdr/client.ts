@@ -146,6 +146,11 @@ export async function focusAgent(target: string): Promise<void> {
   await request("agent.focus", { target });
 }
 
+/** Move the attached TUI onto this tab (Herdr 0.9+ client-local views). */
+export async function focusTab(tabId: string): Promise<void> {
+  await request("tab.focus", { tab_id: tabId });
+}
+
 export type CreatedWorkspace = {
   workspaceId: string;
   label: string;
