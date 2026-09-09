@@ -93,6 +93,8 @@ export function keyFace(opts: {
   focused?: boolean;
   /** Drawn near the top of the key; empty string = colour only. */
   label?: string;
+  /** Second line under `label` (e.g. tab name). */
+  sublabel?: string;
   /** Agent type for the bottom glyph (claude, codex, grok, …). */
   agent?: string;
   /** 0..1 fill brightness. Blocked keys pulse this. */
@@ -103,8 +105,7 @@ export function keyFace(opts: {
   const fill = hex(scaleColor(base, brightness));
   const focused = opts.focused === true;
   const label = (opts.label ?? "").trim();
-
-  const labelY = 40;
+  const sublabel = (opts.sublabel ?? "").trim();
 
   // Focus ring: filled frame (outer white rect minus inner hole via two rects
   // is hard in basic SVG; use a simple thick rounded rect stroke — Stream Deck
@@ -113,9 +114,7 @@ export function keyFace(opts: {
     ? `<rect x="6" y="6" width="${SIZE - 12}" height="${SIZE - 12}" rx="14" ry="14" fill="none" stroke="#ffffff" stroke-width="8"/>`
     : "";
 
-  const text = label
-    ? `<text x="${SIZE / 2}" y="${labelY}" text-anchor="middle" dominant-baseline="central" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="24" font-weight="700">${escapeXml(label)}</text>`
-    : "";
+  const text = labelSvg(label, sublabel);
 
   const glyph = agentGlyphSvg(opts.agent);
 
@@ -130,6 +129,20 @@ export function keyFace(opts: {
 
   // base64 is more reliable than encodeURIComponent for Stream Deck's loader.
   return `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
+}
+
+function labelSvg(label: string, sublabel: string): string {
+  if (!label) return "";
+  const family =
+    'font-family="Helvetica, Arial, sans-serif" text-anchor="middle" dominant-baseline="central" fill="#ffffff"';
+  const x = SIZE / 2;
+  if (!sublabel) {
+    return `<text x="${x}" y="40" ${family} font-size="23" font-weight="700">${escapeXml(label)}</text>`;
+  }
+  return (
+    `<text x="${x}" y="28" ${family} font-size="23" font-weight="700">${escapeXml(label)}</text>` +
+    `<text x="${x}" y="52" ${family} font-size="22" font-weight="600" fill-opacity="0.88">${escapeXml(sublabel)}</text>`
+  );
 }
 
 /** @deprecated Prefer keyFace — kept for any leftover solid-only call sites. */

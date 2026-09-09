@@ -11,7 +11,7 @@ import streamDeck from "@elgato/streamdeck";
 
 import { bridge } from "../herdr/bridge";
 import { normalizeStatus } from "../herdr/status";
-import { displayName, type BridgeState } from "../herdr/types";
+import { displayName, tabDisplayName, type BridgeState } from "../herdr/types";
 import { keyFace } from "../render/key-image";
 import { raiseTerminal } from "../terminal";
 
@@ -26,8 +26,8 @@ type SlotSettings = {
 
 /**
  * One key = one agent slot. Colour tracks status; label is the Herdr workspace
- * name (sidebar), painted into the key image near the top.
- * Press focuses that agent and raises the terminal.
+ * name (sidebar) with the tab name on the line below, painted into the key
+ * image near the top. Press focuses that agent and raises the terminal.
  *
  * On a classic 15-key deck the top two rows are the herdr surface (10 keys).
  * Empty settings auto-map from position, so a fresh drag-and-drop just works.
@@ -132,11 +132,13 @@ export class AgentSlot extends SingletonAction<SlotSettings> {
 
     const status = normalizeStatus(agent.status);
     const name = truncate(displayName(agent, state.workspaceLabels), 14);
+    const tab = tabDisplayName(agent, state.tabLabels);
     await action.setImage(
       keyFace({
         status,
         focused: agent.focused,
         label: name,
+        sublabel: tab ? truncate(tab, 16) : undefined,
         agent: agent.agent,
         // Software stand-in for the Micro's blocked breathing LED.
         brightness: status === "blocked" ? state.breath : 1,

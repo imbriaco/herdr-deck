@@ -1,6 +1,13 @@
 import streamDeck from "@elgato/streamdeck";
 
-import { focusAgent, HerdrEventStream, listAgents, listWorkspaceLabels } from "./client";
+import {
+  focusAgent,
+  focusTab,
+  HerdrEventStream,
+  listAgents,
+  listTabLabels,
+  listWorkspaceLabels,
+} from "./client";
 import type { BridgeListener, BridgeState, HerdrAgent } from "./types";
 import { focusTarget } from "./types";
 
@@ -23,6 +30,7 @@ class HerdrBridge {
   private state: BridgeState = {
     agents: [],
     workspaceLabels: {},
+    tabLabels: {},
     connected: false,
     breath: 1,
   };
@@ -96,6 +104,9 @@ class HerdrBridge {
     // next list) will reconcile if something races us.
     this.applyOptimisticFocus(slot);
     await focusAgent(target);
+    // agent.focus updates server-side agent focus; Herdr 0.9+ TUI clients
+    // keep their own workspace/tab view and need tab.focus to actually move.
+    if (agent.tabId) await focusTab(agent.tabId);
   }
 
   /** Flip focused flags locally so the ring doesn't wait on the next poll. */
@@ -136,14 +147,16 @@ class HerdrBridge {
     if (!this.started) return;
     try {
       // Labels in parallel so a slow workspace.list can't block status for long.
-      const [agents, workspaceLabels] = await Promise.all([
+      const [agents, workspaceLabels, tabLabels] = await Promise.all([
         listAgents(),
         listWorkspaceLabels().catch(() => this.state.workspaceLabels),
+        listTabLabels().catch(() => this.state.tabLabels),
       ]);
       this.reconcileStatusStreams(agents);
       this.publish({
         agents,
         workspaceLabels,
+        tabLabels,
         connected: true,
         error: undefined,
         breath: this.state.breath,
@@ -154,6 +167,7 @@ class HerdrBridge {
       this.publish({
         agents: this.state.agents,
         workspaceLabels: this.state.workspaceLabels,
+        tabLabels: this.state.tabLabels,
         connected: false,
         error: message,
         breath: this.state.breath,
@@ -173,8 +187,10 @@ class HerdrBridge {
         // Focus changes (Herdr keys, mouse, another client) — without this the
         // white border only moved on the 2.5s poll.
         { type: "pane.focused" },
-        // Workspace rename so key labels track the sidebar.
+        // Workspace / tab rename so key labels track the sidebar.
         { type: "workspace.renamed" },
+        { type: "tab.renamed" },
+        { type: "tab.created" },
       ],
       () => this.schedule(),
       () => {
